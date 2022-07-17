@@ -10,8 +10,23 @@
 (defn home []
   (os/getenv "HOME"))
 
-(defn get_cfg_dir []
-  (string (home) "/.cfg"))
+(defn get-cosmo-dir []
+  (def path (path/join (home) ".cosmo"))
+  (def stat (os/stat path))
+  (if (and (not (= stat nil)) (= (stat :mode) :directory))
+      path
+      (path/join (home) ".cfg"))) # TODO fall back to cfg until everything is migrated
+
+(defn get_cosmo_config_dir []
+  (path/join (home) ".config" "cosmo"))
+
+(defn has-internet []
+  (prompt :a (loop [i :range [0 6]]
+               (try (do (net/close (net/connect "1.1.1.1" 53))
+                        (return :a true))
+                    ([err] (do (print err)
+                               (os/sleep 1)))))
+             (return :a false)))
 
 (defn to_two_digit_string [num]
   (if (< num 9)
@@ -70,9 +85,9 @@
   #(def version (string (ev/read (streams 0) :all)))
   true)
 
-(defn get_config_path [] (string (get_cfg_dir) "/config.jdn"))
+(defn get_config_path [] (string (get-cosmo-dir) "/config.jdn"))
 
-(defn get_cache_path [] (string (get_cfg_dir) "/cache.jdn"))
+(defn get_cache_path [] (string (get-cosmo-dir) "/cache.jdn"))
 
 (defn file_exists? [path]
   (def stat (os/stat path))
@@ -130,34 +145,34 @@
   [key-tuple value]
   (cache/eval (fn [x] (put-in x key-tuple value) x)))
 
-(defn cfg [& args]
+(defn git [& args]
   (def streams (os/pipe))
   (def status (os/execute ["git"
-                           (string "--git-dir=" (get_cfg_dir))
+                           (string "--git-dir=" (get-cosmo-dir))
                            (string "--work-tree=" (os/getenv "HOME"))
                            ;args]
                           :pe {:out (streams 1) "MERGE_AUTOSTASH" "true"}))
   (ev/close (streams 1))
   {:status status :text (string/trim (string (ev/read (streams 0) :all)))})
 
-(defn cfg_fail_on_error [& args]
-  (def result (cfg ;args))
+(defn git_fail_on_error [& args]
+  (def result (git ;args))
   (if (not (= (result :status) 0))
     (error (result :text))
     result))
 
-(defn cfg_loud [& args]
+(defn git_loud [& args]
   (os/execute ["git" 
-               (string "--git-dir=" (get_cfg_dir))
+               (string "--git-dir=" (get-cosmo-dir))
                (string "--work-tree=" (os/getenv "HOME"))
                ;args] :p))
 
-(defn cfg_loud_fail_on_error [& args]
-  (if (not (= (cfg_loud ;args) 0))
+(defn git_loud_fail_on_error [& args]
+  (if (not (= (git_loud ;args) 0))
     (error "cfg command failed, see above for logs.")))
 
 (defn get_sync_lock []
-  (flock/acquire (string (get_cfg_dir) "/sync.lock") :block :exclusive))
+  (flock/acquire (string (get-cosmo-dir) "/sync.lock") :block :exclusive))
 
 (defn sync_enabled? [] # Note: this could be cached in the future
   (def config (config/get))
@@ -172,37 +187,35 @@
       (os/exit 1))))
 
 (defn execute_pre_sync_hook []
-  (def path (string (get_cfg_dir) "/hooks/pre-sync"))
+  (def path (string (get-cosmo-dir) "/hooks/pre-sync"))
   (if (file_exists? path)
     (do (print "Executing pre-sync-hook...")
         (= (os/execute [path] :p) 0))
     true))
 
 (defn execute_post_sync_hook []
-  (def path (string (get_cfg_dir) "/hooks/post-sync"))
+  (def path (string (get-cosmo-dir) "/hooks/post-sync"))
   (if (file_exists? path)
     (do (print "Executing post-sync-hook...")
         (= (os/execute [path] :p) 0))
     true))
 
 (defn sync_after_lock []
-  # define some way for hooks that lead to recompilations etc when the incoming changes modify a source-file e.g.
-  # $HOME/.config/janet/src/cfg/cfg.janet
-  (def head_before_sync ((cfg_fail_on_error "rev-parse" "HEAD") :text))
-  (cfg_loud "pull" "--no-rebase" "--no-edit")
+  (def head_before_sync ((git_fail_on_error "rev-parse" "HEAD") :text))
+  (git_loud "pull" "--no-rebase" "--no-edit")
   # check if all commits since head_before_sync were signed, abort if not NOTE: this may be to radical and break things, maybe just define that the last edit of some important files should be signed
   # secrets_generate-allowed-signers # TODO only do this when there were relevant changes
   # secrets_generate-allowed-keys # TODO only do this when there were relevant changes
-  # cfg:ensure_key-added (can probably be scrapped with a conditional error detection or assumed to be taken care of during init)
+  # cosmo:ensure_key-added (can probably be scrapped with a conditional error detection or assumed to be taken care of during init)
   #if type -q systemctl
-  #if cfg:changed $HEAD_BEFORE_SYNC $__fish_config_dir/data/services/$NODE_NAME
+  #if cosmo:changed $HEAD_BEFORE_SYNC $__fish_config_dir/data/services/$NODE_NAME
   #    system:services:setup
   #end
   #end
-  #cfg add -A (still needed?)
-  (if (not (= ((cfg "rev-parse" "origin") :text) ((cfg "rev-parse" "main") :text)))
+  #git add -A (still needed?)
+  (if (not (= ((git "rev-parse" "origin") :text) ((git "rev-parse" "main") :text)))
     (do (print "Starting push...")
-      (cfg_loud "push"))
+      (git_loud "push"))
     (print "Nothing to push"))
   (if (not (execute_post_sync_hook))
       (eprint "Post_sync_hook failed!")))
@@ -222,7 +235,7 @@
         ([err]
           (pp err)
           (print "Normal file locking failed, falling back to using flock...")
-          (os/execute ["flock" "-x" (string (get_cfg_dir) "/sync.lock") "-c" "janet -e '(import cfg)(cfg/sync_after_lock)'"] :p))))
+          (os/execute ["flock" "-x" (string (get-cosmo-dir) "/sync.lock") "-c" "janet -e '(import cfg)(git/sync_after_lock)'"] :p))))
     (eprint "Sync disabled!")))
 
 (defn enable_sync [] (config/set [:sync :disabled] nil))
@@ -236,20 +249,20 @@
 
 (defn sync_notes []
   # TODO fix this
-  (cfg_loud "fetch" "origin" "refs/notes/*:refs/notes/*")
-  (cfg_loud "push" "origin" "'refs/notes/*"))
+  (git_loud "fetch" "origin" "refs/notes/*:refs/notes/*")
+  (git_loud "push" "origin" "'refs/notes/*"))
 
 (defn verify_file_command [file]
   # TODO maybe check if allowed_signes and allowed_keys are signed with local key?
   # maybe save pubkey at compile time?
-  (def status (cfg "verify-commit" ((cfg "log" "-n" "1" "--pretty=format:%H" "--" file) :text)))
+  (def status (git "verify-commit" ((git "log" "-n" "1" "--pretty=format:%H" "--" file) :text)))
   (os/exit status))
 
 (defn list_unsigned_files []
   # TODO
-  # {(deps cfg cfg:verify_file)}
-  #for file in (cfg ls-files)
-  #      if not cfg:verify_file $file >/dev/null 2>&1
+  # {(deps cosmo:verify_file)}
+  #for file in (git ls-files)
+  #      if not cosmo:verify_file $file >/dev/null 2>&1
   #          echo $file
   #      end
   # end
@@ -257,17 +270,17 @@
 
 (defn add_signing_key []
   # TODO
-  # this is kind of a hack to ensure that cfg:sync keeps working even when the specified key id in .gitconfig is corrupted
-  # I could check if cfg was already setup to use the correct key, but this command only takes 15 ms on my machine and is much more robust
+  # this is kind of a hack to ensure that cosmo:sync keeps working even when the specified key id in .gitconfig is corrupted
+  # I could check if cosmo was already setup to use the correct key, but this command only takes 15 ms on my machine and is much more robust
   #set key (set -l _ssh_key (cat ~/.ssh/id_ed25519.pub | string split " ") && echo $_ssh_key[1..2])
-  #cfg store_set user-signing-key "$key"
+  #cosmo store_set user-signing-key "$key"
   )
 
 (defn changed [commit_hash file_path]
   "return 0 when the file at file_path has changed since commit_hash'"
   # TODO  
   #set file_path (string replace $HOME/ '' $file_path)
-  #set files_changed (cfg diff --name-only $hash..HEAD)
+  #set files_changed (git diff --name-only $hash..HEAD)
 
   #for file in $files_changed
   #if test $file = $file_path
@@ -278,14 +291,14 @@
   )
 
 (defn store_help []
-  (print "Store allows storing unencrypted strings in the cfg git repo, available commands are:")
+  (print "Store allows storing unencrypted strings in the cosmo git repo, available commands are:")
   (print " get $KEY - Prints the value for key without extra newline")
   (print " set $KEY $VALUE - Set a key to the given value")
   (print " list $OPTIONAL_PATTERN - If glob-pattern was given, list all keys matching it, else list all")
   (print " delete $KEY - Delete the key"))
 
 (defn store_get [key]
-  (def path (string (os/getenv "HOME") "/.config/cfg_store/" key))
+  (def path (path/join (get_cosmo_config_dir) "store" key))
   (def stat (os/stat path))
   (if (or (= stat nil) (not (= (stat :mode) :file)))
     (do
@@ -294,31 +307,31 @@
   (prin (slurp path))(flush))
 
 (defn store_set [key value]
-  (create_dir_if_not_exists (string (os/getenv "HOME") "/.config/cfg_store"))
-  (def path (string (os/getenv "HOME") "/.config/cfg_store/" key))
+  (create_dir_if_not_exists (path/join (get_cosmo_config_dir) "store"))
+  (def path (path/join (get_cosmo_config_dir) "store" key))
   (spit path value)
   (def sync_lock (get_sync_lock))
-  (cfg_loud_fail_on_error "reset")
-  (cfg_loud_fail_on_error "add" "-f" path)
-  (cfg_loud_fail_on_error "commit" "-m" (string "store: set " key " to " value))
+  (git_loud_fail_on_error "reset")
+  (git_loud_fail_on_error "add" "-f" path)
+  (git_loud_fail_on_error "commit" "-m" (string "store: set " key " to " value))
   (flock/release sync_lock))
 
 (defn store_list [glob-pattern]
-  (create_dir_if_not_exists (string (os/getenv "HOME") "/.config/cfg_store"))
+  (create_dir_if_not_exists (path/join (get_cosmo_config_dir) "store"))
   (if (= glob-pattern nil)
-    (each file (os/dir (string (os/getenv "HOME") "/.config/cfg_store"))
+    (each file (os/dir (path/join (get_cosmo_config_dir) "store"))
       (print file))
     (do (def pattern (glob/glob-to-peg glob-pattern))
-      (each file (os/dir (string (os/getenv "HOME") "/.config/cfg_store"))
+      (each file (os/dir (path/join (get_cosmo_config_dir) "store"))
         (if (peg/match pattern file) (print file))))))
 
 (defn store_delete [key]
-  (def path (string (os/getenv "HOME") "/.config/cfg_store/" key))
+  (def path (path/join (get_cosmo_config_dir) "store" key))
   (def sync_lock (get_sync_lock))
   (os/rm path)
-  (cfg_loud_fail_on_error "reset")
-  (cfg_loud_fail_on_error "add" "-f" path)
-  (cfg_loud_fail_on_error "commit" "-m" (string "store: deleted " key))
+  (git_loud_fail_on_error "reset")
+  (git_loud_fail_on_error "add" "-f" path)
+  (git_loud_fail_on_error "commit" "-m" (string "store: deleted " key))
   (flock/release sync_lock))
 
 (defn secrets_help []
@@ -357,11 +370,11 @@
     (return verified false)))
 
 (defn secrets_decrypt_secret [secret] 
-  (let [stat (os/stat (string (home) "/.config/cfg/secrets/store/" secret ".age"))]
+  (let [stat (os/stat (path/join (get_cosmo_config_dir) "secrets" "store" (string secret ".age")))]
     (if (or (= stat nil) (not (= (stat :mode) :file))) (error "Secret does not exist")))
   # TODO verify_file is broken at the moment skipping it for now
-  #(if (not (verify_file (string (home) "/.config/cfg/secrets/store/" secret ".age"))) (error "No valid signature found! Aborting..."))
-  (os/execute ["age" "-i" (string (home) "/.ssh/id_ed25519") "-d" (string (home) "/.config/cfg/secrets/store/" secret ".age")] :p))
+  #(if (not (verify_file (string (home) "/.config/cosmo/secrets/store/" secret ".age"))) (error "No valid signature found! Aborting..."))
+  (os/execute ["age" "-i" (string (home) "/.ssh/id_ed25519") "-d" (path/join (get_cosmo_config_dir) "secrets" "store" (string secret ".age"))] :p))
 
 (defn secrets_decrypt [args]
   # {(deps age secrets:verify_file)}
@@ -375,14 +388,14 @@
   (error "Not implemented yet"))
 
 (defn status []
-  (cfg_loud "status"))
+  (git_loud "status"))
 
 (defn init []
   # TODO also set git ssh key for signing here, we could also guard against other possible miconfiguration here
   # TODO always ensure that init can be executed as often as you like without changing outcome (I forgot the correct term for that property)
-  (print "Starting initialization of cfg repo...")
+  (print "Starting initialization of cosmo repo...")
   (print "Starting node init")
-  # TODO create dirs in .cfg when needed like messages (and maybe locks?)
+  # TODO create dirs in .cosmo when needed like messages (and maybe locks?)
   #TODO if already setup ask if node init (skip asking if skip_node_init true)
   #TODO ask for name for this node and which groups it should belong to
   (def config (config/get))
@@ -392,22 +405,22 @@
   (def node_name (string/trim (file/read stdin :line)))
   (def new_node_name (if (= node_name "") old_node_name node_name))
   (config/set [:node :name] new_node_name)
-  #   YES -> print out command: cfg init_node "$NAME" "$PUB_KEY" $GROUPS
-  #   NO  -> print out command: cfg init_node "$NAME" "$PUB_KEY" $GROUPS
+  #   YES -> print out command: cosmo init_node "$NAME" "$PUB_KEY" $GROUPS
+  #   NO  -> print out command: cosmo init_node "$NAME" "$PUB_KEY" $GROUPS
   # This command adds the key of the node to the repo, signs and commits it, reecnrypts secrets which belong the mentioned groups and pushes it
   # At the same time it checks which git hoster is used and depending on the groups its in adds the key to the user keys or the repo deploy keys using the respective api and tokens saved in secrets
   # if command on other trusted machine is finished, the user should confirm this on the new node
   # check if clone is successfull, else tell the user and wait for confirmation to try again, start completly from the beginning or abort the whole init process
-  # TODO if no hooks exist yet check if there are some at .config/cfg/default_hooks and install them by copying them to .cfg
-  (let [path (string (home) "/.config/cfg/hooks/pre-sync.janet")]
+  # TODO if no hooks exist yet check if there are some at .config/cosmo/default_hooks and install them by copying them to .cosmo
+  (let [path (path/join (get_cosmo_config_dir) "hooks" "pre-sync")]
     (if (file_exists? path)
-      (spit (string (get_cfg_dir) "/hooks/pre-sync.janet") (slurp path))))
-  (let [path (string (home) "/.config/cfg/hooks/post-sync.janet")]
+      (spit (path/join (get-cosmo-dir) "hooks" "pre-sync") (slurp path))))
+  (let [path (path/join (get_cosmo_config_dir) "hooks" "post-sync")]
     (if (file_exists? path)
-      (spit (string (get_cfg_dir) "/hooks/post-sync.janet") (slurp path))))
-  # TODO execute script at .config/cfg/init.janet
-  (os/mkdir (string (get_cfg_dir) "/messages"))
-  (cfg "config" "gpg.ssh.allowedSignersFile" (string (os/getenv "HOME") "/.ssh/allowed_signers"))
+      (spit (path/join (get-cosmo-dir) "hooks" "post-sync") (slurp path))))
+  # TODO execute script at .config/cosmo/init.janet
+  (os/mkdir (string (get-cosmo-dir) "/messages"))
+  (git "config" "gpg.ssh.allowedSignersFile" (string (os/getenv "HOME") "/.ssh/allowed_signers"))
   (if (get-in config [:node :sign :secret-key])
     (print "Skipping signing key generation as there are keys saved.")
     (do (prin "Generating and saving machine signing keys...")
@@ -426,7 +439,7 @@
 
 (defn get_prompt []
   (def sync_status (if (sync_enabled?) "" "sync:disabled "))
-  (def changes_array (string/split "\n" ((cfg "status" "--porcelain=v1") :text)))
+  (def changes_array (string/split "\n" ((git "status" "--porcelain=v1") :text)))
   (var changes_count (length changes_array))
   (if (= changes_count 1) (if (= (changes_array 0) "") (set changes_count 0)))
   (def changes_status (if (> changes_count 0) (string changes_count " uncommitted changes ")))
@@ -441,22 +454,22 @@
       (os/exit 1))))
 
 (defn help []
-  (print "Top-Level commands for cfg.janet:")
+  (print "Top-Level commands for cosmo")
   (print "  help - this help message")
   (print "  get_prompt - returns shell prompt module text")
   (print "  init - intialize a new node")
-  (print "  sync - sync commands, for help use cfg sync help")
-  (print "  universal_vars - Universal Variables, check cfg universal_vars help")
+  (print "  sync - sync commands, for help use cosmo sync help")
+  (print "  universal_vars - Universal Variables, check cosmo universal_vars help")
   (print "  list_unsigned_files - list all files that were last modified in a unsigned commit")
   (print "  verify_file - check if last modification of file was signed")
-  (print "  store - store commands, for help use cfg store help")
-  (print "  secrets - secrets commands, for help use cfg secrets help")
+  (print "  store - store commands, for help use cosmo store help")
+  (print "  secrets - secrets commands, for help use cosmo secrets help")
   (print "  get_nodes_in_group - get nodes in group"))
 
 (defn universal_vars/help []
   (print "Universal Vars allow for the use of global environment variables that are loaded at the start of each shell session")
   (print "to use these include something like this in your .bashrc/config.fish etc:")
-  (print "eval $(cfg universal_vars)")
+  (print "eval $(git universal_vars)")
   (print "These are all available universal_vars subcommands:")
   (print "  help - this help")
   (print "  set $key $value - set the env var specified by $key to $value")
@@ -466,7 +479,7 @@
 (defn universal_vars/export
   "returns the universal vars formatted for shell consumption"
   []
-  (def file_path (path/join (get_cfg_dir) "universal_vars.jdn"))
+  (def file_path (path/join (get-cosmo-dir) "universal_vars.jdn"))
   (def vars (if (file_exists? file_path)
                 (parse (slurp file_path))
                 @{}))
@@ -480,7 +493,7 @@
       (print "export NODE_NAME=unknown")))
 
 (defn universal_vars/get_all []
-  (def file_path (path/join (get_cfg_dir) "universal_vars.jdn"))
+  (def file_path (path/join (get-cosmo-dir) "universal_vars.jdn"))
   (if (and (file_exists? file_path) (not (= ((os/stat file_path) :size) 0)))
       (parse (slurp file_path))
       @{}))
@@ -488,7 +501,7 @@
 (defn universal_vars/set
   "modify the config using the given function"
   [key value]
-  (def file_path (path/join (get_cfg_dir) "universal_vars.jdn"))
+  (def file_path (path/join (get-cosmo-dir) "universal_vars.jdn"))
   (def lock (flock/acquire file_path :block :exclusive))
   (def old_conf (universal_vars/get_all))
   (def new_conf (put old_conf key value))
@@ -534,9 +547,9 @@
     (os/sleep 300)))
 
 (defn daemon/help []
-  (print `the cfgd daemon runs in the background to regularily initiate a sync operation
+  (print `the cosmod daemon runs in the background to regularily initiate a sync operation
           and also allows some more functionality to be developed
-          cfgd subcommands:
+          cosmod subcommands:
             start - start the daemon
             stop - stop the daemon`))
 
@@ -544,7 +557,7 @@
   (error "Not implemented"))
 
 (defn daemon/start []
-  (try (do (def sync_lock (flock/acquire (string (get_cfg_dir) "/daemon.lock") :noblock :exclusive))
+  (try (do (def sync_lock (flock/acquire (string (get-cosmo-dir) "/daemon.lock") :noblock :exclusive))
          (if (= sync_lock nil)
            (do (print "Daemon already running!")
              (os/exit 1))
@@ -554,7 +567,7 @@
     ([err]
       (pp err)
       (print "Normal file locking failed, falling back to using flock...")
-      (os/execute ["flock" "-x" "-n" (string (get_cfg_dir) "/sync.lock") "-c" "janet -e '(import cfg)(cfg/daemon_after_lock)'"] :p))))
+      (os/execute ["flock" "-x" "-n" (string (get-cosmo-dir) "/sync.lock") "-c" "janet -e '(import cosmo)(cosmo/daemon_after_lock)'"] :p))))
 
 (defn get_node_name []
   (def config (config/get))
@@ -609,4 +622,4 @@
     ["verify_file" file] (verify_file_command file)
     ["list_unsigned_files"] (list_unsigned_files)
     ["get_nodes_in_group" group] (get_nodes_in_group group) # TODO think of better name and change it everywhere
-    _ (os/exit (cfg_loud ;raw_args))))
+    _ (os/exit (git_loud ;raw_args))))
