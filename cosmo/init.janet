@@ -20,14 +20,6 @@
 (defn get_cosmo_config_dir []
   (path/join (home) ".config" "cosmo"))
 
-(defn has-internet []
-  (prompt :a (loop [i :range [0 6]]
-               (try (do (net/close (net/connect "1.1.1.1" 53))
-                        (return :a true))
-                    ([err] (do (print err)
-                               (os/sleep 1)))))
-             (return :a false)))
-
 (defn to_two_digit_string [num]
   (if (< num 9)
     (string "0" num)
@@ -187,17 +179,17 @@
       (os/exit 1))))
 
 (defn execute_pre_sync_hook []
-  (def path (string (get-cosmo-dir) "/hooks/pre-sync"))
+  (def path (path/join (get-cosmo-dir) "hooks" "pre-sync"))
   (if (file_exists? path)
     (do (print "Executing pre-sync-hook...")
-        (= (os/execute [path] :p) 0))
+        (= (os/execute [path]) 0))
     true))
 
 (defn execute_post_sync_hook []
-  (def path (string (get-cosmo-dir) "/hooks/post-sync"))
+  (def path (path/join (get-cosmo-dir) "hooks" "post-sync"))
   (if (file_exists? path)
     (do (print "Executing post-sync-hook...")
-        (= (os/execute [path] :p) 0))
+        (= (os/execute [path]) 0))
     true))
 
 (defn sync_after_lock []
