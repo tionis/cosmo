@@ -172,17 +172,18 @@
       (os/exit 1))))
 
 (defn execute_pre_sync_hook []
-  (def path (string (get_cfg_dir) "/hooks/pre-sync.janet"))
+  (def path (string (get_cfg_dir) "/hooks/pre-sync"))
   (if (file_exists? path)
     (do (print "Executing pre-sync-hook...")
-      ((get-in (dofile path) ['pre-sync :value])))
+        (= (os/execute [path] :p) 0))
     true))
 
 (defn execute_post_sync_hook []
-  (def path (string (get_cfg_dir) "/hooks/post-sync.janet"))
+  (def path (string (get_cfg_dir) "/hooks/post-sync"))
   (if (file_exists? path)
     (do (print "Executing post-sync-hook...")
-      ((get-in (dofile path {:env (curenv)}) ['post-sync :value])))))
+        (= (os/execute [path] :p) 0))
+    true))
 
 (defn sync_after_lock []
   # define some way for hooks that lead to recompilations etc when the incoming changes modify a source-file e.g.
@@ -203,7 +204,8 @@
     (do (print "Starting push...")
       (cfg_loud "push"))
     (print "Nothing to push"))
-  (execute_post_sync_hook))
+  (if (not (execute_post_sync_hook))
+      (eprint "Post_sync_hook failed!")))
 
 (defn sync []
   # TODO check if internet and abort if not (this has to be able to be disabled )(maybe check config?)
