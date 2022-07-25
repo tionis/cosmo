@@ -6,19 +6,28 @@
 (import jhydro)
 (import sqlite3)
 (import ./base64)
+(import ./filesystem)
 
 (defn home []
-  (os/getenv "HOME"))
+  (def p (os/getenv "HOME"))
+  (if (or (not p) (= p ""))
+      (let [userprofile (os/getenv "USERPROFILE")]
+           (if (or (not userprofile) (= userprofile ""))
+               (error "Could not determine home directory")
+               userprofile))
+      p))
+
+(defn get-config-home []
+  (def xdg_config_home (os/getenv "XDG_CONFIG_HOME"))
+  (if (or (not xdg_config_home) (= xdg_config_home ""))
+      (path/join (home) ".config")
+      xdg_config_home))
 
 (defn get-cosmo-dir []
-  (def path (path/join (home) ".cosmo"))
-  (def stat (os/stat path))
-  (if (and (not (= stat nil)) (= (stat :mode) :directory))
-      path
-      (path/join (home) ".cfg"))) # TODO fall back to cfg until everything is migrated
+  (path/join (get-config-home) "cosmo" ".git"))
 
 (defn get_cosmo_config_dir []
-  (path/join (home) ".config" "cosmo"))
+  (path/join (get-config-home) "cosmo"))
 
 (defn to_two_digit_string [num]
   (if (< num 9)
@@ -77,9 +86,9 @@
   #(def version (string (ev/read (streams 0) :all)))
   true)
 
-(defn get_config_path [] (string (get-cosmo-dir) "/config.jdn"))
+(defn get_config_path [] (path/join (get-cosmo-dir) "config.jdn"))
 
-(defn get_cache_path [] (string (get-cosmo-dir) "/cache.jdn"))
+(defn get_cache_path [] (path/join (get-cosmo-dir) "cache.jdn"))
 
 (defn file_exists? [path]
   (def stat (os/stat path))

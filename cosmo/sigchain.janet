@@ -1,0 +1,1 @@
+# canonicalize json: jq -MSc
