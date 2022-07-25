@@ -5,6 +5,7 @@ Cosmo is a simple git-based dotfile management tool, with some added features th
 ## Goals
 - Managment of dotfiles with optionally encrypted files
 - Node managment with groups using a siggraph (a sigchain that can fork and merge)
+- ssh key managment of nodes (they sign a statment using their node-key which ssh pubkey belongs to them)
 - secrets that are only accessible by groups specified
 - general key-value store with support for glob patterns for listing
 - ssh hosts managment
