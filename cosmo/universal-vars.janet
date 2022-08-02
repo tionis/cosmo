@@ -18,12 +18,18 @@
     (store/ls-contents (string "vars/" pattern))
     (store/ls-contents "vars/*")))
 
+(defn trim-prefix [prefix str]
+  (if (string/has-prefix? prefix str)
+      (slice str (length prefix) -1)
+      str))
+
 (defn export
   "returns the universal vars formatted for shell consumption as string"
   [&opt pattern]
   (def parts @[])
   (def vars (merge (global/ls-contents pattern) (local/ls-contents pattern)))
-  (eachk key vars (array/push parts (string "export " key "=\"" (vars key) "\"")))
+  (eachk key vars
+    (array/push parts (string "export " (trim-prefix "vars/" key) "=\"" (vars key) "\"")))
   (def node-name (cache/get "node/name"))
   (if node-name
       (array/push parts (string "export NODE_NAME=\"" node-name "\""))
