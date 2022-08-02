@@ -22,7 +22,7 @@
   # TODO ask for name for this node and which groups it should belong to
   (var old_node_name (cache/get "node/name"))
   (if (or (not old_node_name) (= old_node_name ""))
-      (set old_node_name (exec-slurp ["uname" "-n"])))
+      (set old_node_name (exec-slurp "uname" "-n")))
   (prin (string "node.name[" old_node_name "]> "))(flush)
   (def node_name (string/trim (file/read stdin :line)))
   (def new_node_name (if (= node_name "") old_node_name node_name))
