@@ -29,7 +29,7 @@
       (print val)
       (print (string/format "%j" val))))
 
-(defn store/handler [key]
+(defn store/handler [args]
   (setdyn :args @[((dyn :args) 0) ;(slice (dyn :args) 2 -1)])
   (def args (argparse/argparse ;store/argparse))
   (unless args (os/exit 1))
@@ -55,10 +55,10 @@
             (do (if (< (length (args :default)) 3) (error "Key or value to set not specified"))
               (cosmo/store/set ((args :default) 1) ((args :default) 2))))
     "ls"  (if (args "local") # TODO think of better way for passing list to user (human readable key=value but if --json is given print list as json?)
-            (let [patt (if (> (length (args :default)) 1) () nil)
+            (let [patt (if (> (length (args :default)) 1) (string/join (slice (args :default) 1 -1) "/") nil)
                 list (cosmo/cache/ls-contents patt)]
               (print (string/format "%P" list)))
-            (let [patt (if (> (length (args :default)) 1) () nil)
+            (let [patt (if (> (length (args :default)) 1) (string/join (slice (args :default) 1 -1) "/") nil)
                 list (cosmo/store/ls-contents patt)]
               (print (string/format "%P" list))))
     "rm"  (if (args "local")
@@ -69,12 +69,12 @@
     (do (eprint "Unknown subcommand")
         (os/exit 1))))
 
-(defn universal-vars/handler [key])
-    #["universal_vars" "help"] (universal_vars/help) # TODO diff between global and local universal vars
-    #["universal_vars" "set" key value] (universal-vars/set key value)
-    #["universal_vars" "get" key] (universal-vars/get key)
-    #["universal_vars" "rm" key] (universal-vars/set key nil)
-    #["universal_vars" "export"] (universal-vars/export))
+(def universal-vars/help
+  `Universal vars are environment variables that are sourced at the beginning of a shell session.
+  This allows to have local env-vars that are either machine specific or shared among all.
+  To create an environment variable use the store, all variables are stored under the vars/* prefix
+  Available Subcommands:
+    export $optional_pattern - return the  environment variables matching pattern, all if none is given in a format that can be evaled by posix shells`)
 
 (defn daemon/help []
   (print `the cosmod daemon runs in the background to regularily initiate a sync operation
@@ -143,7 +143,9 @@
     #["motd" "rm" id] (motd/rm id)
     #["motd"] (motd)
     ["get_node_name"] (print (cosmo/cache/get "node/name"))
-    ["universal_vars" & args] (universal-vars/handler args)
+    ["vars" "export"] (print (cosmo/universal-vars/export))
+    ["vars" "help"] (print universal-vars/help)
+    ["vars"] (print universal-vars/help)
     #["verify_file" file] (verify_file_command file)
     #["list_unsigned_files"] (list_unsigned_files)
     #["get_nodes_in_group" group] (get_nodes_in_group group) # TODO think of better name and change it everywhere

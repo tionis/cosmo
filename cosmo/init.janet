@@ -34,20 +34,24 @@
   # if command on other trusted machine is finished, the user should confirm this on the new node
   # check if clone is successfull, else tell the user and wait for confirmation to try again, start completly from the beginning or abort the whole init process
   # TODO if no hooks exist yet check if there are some at .config/cosmo/default_hooks and install them by copying them to .cosmo
-  (let [path (path/join (get_cosmo_config_dir) "hooks" "pre-sync")]
-    (if (file_exists? path)
-      (spit (path/join (get-cosmo-dir) "hooks" "pre-sync") (slurp path))))
-  (let [path (path/join (get_cosmo_config_dir) "hooks" "post-sync")]
-    (if (file_exists? path)
-      (spit (path/join (get-cosmo-dir) "hooks" "post-sync") (slurp path))))
+  (let [source (path/join (get_cosmo_config_dir) "hooks" "pre-sync")
+        target (path/join (get-cosmo-dir) "hooks" "pre-sync")]
+    (if (file_exists? source)
+        (do (spit target (slurp source))
+            (os/chmod target "rwx------"))))
+  (let [source (path/join (get_cosmo_config_dir) "hooks" "post-sync")
+        target (path/join (get-cosmo-dir) "hooks" "post-sync")]
+    (if (file_exists? source)
+        (do (spit target (slurp source))
+            (os/chmod target "rwx------"))))
   # TODO execute script at .config/cosmo/init.janet
   (os/mkdir (string (get-cosmo-dir) "/messages"))
   (git "config" "gpg.ssh.allowedSignersFile" (string (os/getenv "HOME") "/.ssh/allowed_signers"))
-  (if (not (cache/get ["node/sign/secret-key"]))
-    (print "Skipping key generation as there are keys saved.")
-    (do (prin "Generating and saving machine keys...")
-        (crypto/gen_keys)
-        (print "  Done.")))
+  (if (cache/get "node/sign/secret-key")
+      (print "Skipping key generation as there are keys saved.")
+      (do (prin "Generating and saving machine keys...")
+          (crypto/gen_keys)
+          (print "  Done.")))
   (print "Finished."))
 
 (defn get_nodes_in_group [group]
