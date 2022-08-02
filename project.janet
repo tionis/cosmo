@@ -6,9 +6,12 @@
                   "https://github.com/janet-lang/spork"
                   "https://github.com/janet-lang/jhydro"])
 
+(phony "dev" []
+  (os/shell "while true; do inotifywait -r -e modify cosmo; jpm build; done;"))
+
 (declare-source :source ["cosmo"])
 
 (declare-executable
   :name "cosmo"
-  :entry "cosmo/init.janet"
+  :entry "cosmo/cli.janet"
   :install true)
