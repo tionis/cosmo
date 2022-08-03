@@ -8,6 +8,7 @@
 (import ./crypto :export true)
 (import ./daemon :export true)
 (import ./sync :export true)
+(import ./hosts :export true)
 
 (defn status []
   (git/loud "status"))
@@ -49,10 +50,13 @@
   (git "config" "gpg.ssh.allowedSignersFile" (string (os/getenv "HOME") "/.ssh/allowed_signers"))
   (if (cache/get "node/sign/secret-key")
       (print "Skipping key generation as there are keys saved.")
-      (do (prin "Generating and saving machine keys...")
+      (do (prin "Generating and saving machine keys...")(flush)
           (crypto/gen_keys)
           (print "  Done.")))
-  (print "Finished."))
+  (print "Finished.")
+  (prin "Importing hosts db...")(flush)
+  (hosts/import)
+  (print " Done."))
 
 (defn get_nodes_in_group [group]
   # TODO move groups to .ssh or other non-fish location

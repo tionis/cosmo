@@ -115,6 +115,13 @@
             ls $optional_pattern - list messages whose id matches the optional pattern
             help - this help`))
 
+(defn hosts/help []
+  (print `The hosts subsystem manages your ssh hosts
+          Following subcommands are supported
+            help - this help
+            add $address - add address to hosts db, when executed ssh checks the host keys and adds them to the store
+            import - import the hosts in the database into local hosts file`))
+
 (defn help []
   (print `Top-Level commands for cosmo
             help - this help message
@@ -165,6 +172,10 @@
     ["vars" "export"] (print (cosmo/universal-vars/export))
     ["vars" "help"] (print universal-vars/help)
     ["vars"] (print universal-vars/help)
+    ["hosts" "add" address] (cosmo/hosts/add address)
+    ["hosts" "import"] (cosmo/hosts/import)
+    ["hosts" "help"] (hosts/help)
+    ["hosts"] (hosts/help)
     #["verify_file" file] (verify_file_command file)
     #["list_unsigned_files"] (list_unsigned_files)
     #["get_nodes_in_group" group] (get_nodes_in_group group) # TODO think of better name and change it everywhere
