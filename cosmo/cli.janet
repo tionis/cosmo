@@ -101,6 +101,12 @@
   (def changes_status (if (> changes_count 0) (string changes_count " uncommitted changes ")))
   (prin "\x1b[31m" sync_status changes_status "\x1b[37m")(flush))
 
+(defn hooks/help []
+  (print `Execute cosmo hooks, available subcommands:
+            pre-sync - execute pre-sync hook
+            post-sync - execute post-sync hook
+            help - show this help message`))
+
 (defn help []
   (print "Top-Level commands for cosmo")
   (print "  help - this help message")
@@ -133,6 +139,10 @@
     #["sync" "notes"] (sync_notes)
     ["sync" "after_lock"] (cosmo/sync/after_lock)
     ["sync"] (cosmo/sync/sync)
+    ["hooks" "pre-sync"] (cosmo/sync/execute_pre_sync_hook)
+    ["hooks" "post-sync"] (cosmo/sync/execute_post_sync_hook)
+    ["hooks" "help"] (hooks/help)
+    ["hooks"] (hooks/help)
     #["daemon" "start"] (cosmo/daemon/start)
     #["daemon" "stop"] (cosmo/daemon/stop)
     #["daemon" "help"] (cosmo/daemon/help)
