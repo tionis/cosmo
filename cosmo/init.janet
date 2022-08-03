@@ -1,4 +1,8 @@
 #!/bin/env janet
+(import spork :prefix "" :export true)
+(import jhydro :export true)
+(import sqlite3 :export true)
+(import flock :export true)
 (import ./glob :export true)
 (import ./uuid :export true)
 (import ./base64 :export true)
@@ -57,6 +61,8 @@
   (prin "Importing hosts db...")(flush)
   (hosts/import)
   (print " Done."))
+
+(defn id "returns the id of the current node" [] (base64/encode (cache/get "node/sign/public-key")))
 
 (defn motd/add [source id message] (cache/set (string "motd/" id) {:source source :message message}))
 (defn motd/rm [id] (cache/rm (string "motd/" id)))
