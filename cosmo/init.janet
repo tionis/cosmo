@@ -58,29 +58,6 @@
   (hosts/import)
   (print " Done."))
 
-(defn get_nodes_in_group [group]
-  # TODO move groups to .ssh or other non-fish location
-  (def path (string (os/getenv "HOME") "/.config/fish/data/groups/" group))
-  (if (let [metadata (os/stat path)] (and metadata (= (metadata :mode) :file)))
-    (print (string/trim (slurp path)))
-    (do (eprint "Group does not exist!")
-      (os/exit 1))))
-
-(defn universal_vars/help []
-  (print "Universal Vars allow for the use of global environment variables that are loaded at the start of each shell session")
-  (print "to use these include something like this in your .bashrc/config.fish etc:")
-  (print "eval $(git universal_vars)")
-  (print "These are all available universal_vars subcommands:")
-  (print "  help - this help")
-  (print "  export - allow exporting of the universal vars by evaling the result") # TODO improve explanation
-  (print "  set $key $value - set the env var specified by $key to $value")
-  (print "  rm $key - delete env var called $key")
-  (print "  get $key - get the env var by $key, this is not very efficient, and shell scripts should just use the vars that are normally loaded at shell startup")
-  (print "  global set $key $value - set the env var specified by $key to $value globally")
-  (print "  global get $key - get the global env var by $key")
-  (print "  global rm $key - remove a global env var")
-  (print "  global ls - list only global env vars"))
-
 (defn motd/add [source id message] (cache/set (string "motd/" id) {:source source :message message}))
 (defn motd/rm [id] (cache/rm (string "motd/" id)))
 (defn motd/ls-contents [&opt patt]
@@ -94,18 +71,3 @@
     (def item (items key))
     (array/push ret (string "{:source "(item :source) " :id " key "}\nMessage:\n" (item :message))))
   ret)
-
-#(defn motd []
-#  (def motds (cache/get [:motd]))
-#  (if motds
-#    (eachk id motds
-#      (def data (motds id))
-#      (print "Message from " (data :source) " created at <" (data :created_at) "> [" id "]:")
-#      (prin "Message: " (data :data))(flush))))
-
-#(defn motd/add [source id]
-#  (def input (file/read stdin :all))
-#  (cache/set [:motd id] {:source source :data input :created_at (get-iso-datetime)}))
-
-#(defn motd/rm [id]
-#  (cache/set [:motd id] nil))
