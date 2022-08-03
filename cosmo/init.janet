@@ -2,12 +2,12 @@
 (import ./glob :export true)
 (import ./uuid :export true)
 (import ./base64 :export true)
-(import ./sync :export true)
+(import ./util :prefix "" :export true)
+(import ./store :prefix "" :export true)
+(import ./universal-vars :export true)
 (import ./crypto :export true)
 (import ./daemon :export true)
-(import ./universal-vars :export true)
-(import ./store :prefix "" :export true)
-(import ./util :prefix "" :export true)
+(import ./sync :export true)
 
 (defn status []
   (git/loud "status"))
@@ -76,6 +76,20 @@
   (print "  global get $key - get the global env var by $key")
   (print "  global rm $key - remove a global env var")
   (print "  global ls - list only global env vars"))
+
+(defn motd/add [source id message] (cache/set (string "motd/" id) {:source source :message message}))
+(defn motd/rm [id] (cache/rm (string "motd/" id)))
+(defn motd/ls-contents [&opt patt]
+  (if patt
+      (cache/ls-contents (string "motd/" patt))
+      (cache/ls-contents "motd/*")))
+(defn motd/ls-formatted [&opt patt]
+  (def ret @[])
+  (def items (motd/ls-contents patt))
+  (eachk key items
+    (def item (items key))
+    (array/push ret (string "{:source "(item :source) " :id " key "}\nMessage:\n" (item :message))))
+  ret)
 
 #(defn motd []
 #  (def motds (cache/get [:motd]))

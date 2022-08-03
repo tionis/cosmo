@@ -107,18 +107,23 @@
             post-sync - execute post-sync hook
             help - show this help message`))
 
+(defn motd/help []
+  (print `motd - manage your motd by appending message to the greeting in you shell
+          Available subcommands:
+            add $optional_source $optional_id_only_when_source_given - add a message (that is read from stdin) to the motd log
+            rm $id - remove message with id
+            ls $optional_pattern - list messages whose id matches the optional pattern
+            help - this help`))
+
 (defn help []
-  (print "Top-Level commands for cosmo")
-  (print "  help - this help message")
-  (print "  get_prompt - returns shell prompt module text")
-  (print "  init - intialize a new node")
-  (print "  sync - sync commands, for help use cosmo sync help")
-  (print "  universal_vars - Universal Variables, check cosmo universal_vars help")
-  (print "  list_unsigned_files - list all files that were last modified in a unsigned commit")
-  (print "  verify_file - check if last modification of file was signed")
-  (print "  store - store commands, for help use cosmo store help")
-  (print "  secrets - secrets commands, for help use cosmo secrets help")
-  (print "  get_nodes_in_group - get nodes in group"))
+  (print `Top-Level commands for cosmo
+            help - this help message
+            get_prompt - returns shell prompt module text
+            init - intialize a new node
+            sync - sync commands, for help use cosmo sync help
+            universal_vars - Universal Variables, check cosmo universal_vars help
+            store - store commands, for help use cosmo store help
+            motd - motd commands, for help use cosmo motd help`))
 
 (defn main [_ & raw_args]
   (match raw_args
@@ -139,19 +144,23 @@
     #["sync" "notes"] (sync_notes)
     ["sync" "after_lock"] (cosmo/sync/after_lock)
     ["sync"] (cosmo/sync/sync)
-    ["hooks" "pre-sync"] (cosmo/sync/execute_pre_sync_hook)
-    ["hooks" "post-sync"] (cosmo/sync/execute_post_sync_hook)
+    ["hooks" "pre-sync"] (if (cosmo/sync/execute_pre_sync_hook) (os/exit 0) (os/exit 1))
+    ["hooks" "post-sync"] (if (cosmo/sync/execute_post_sync_hook) (os/exit 0) (os/exit 1))
     ["hooks" "help"] (hooks/help)
     ["hooks"] (hooks/help)
     #["daemon" "start"] (cosmo/daemon/start)
     #["daemon" "stop"] (cosmo/daemon/stop)
     #["daemon" "help"] (cosmo/daemon/help)
     #["daemon"] (cosmo/daemon/help)
-    #["motd" "add" source id] (motd/add source id)
-    #["motd" "add" source] (motd/add source (uuid/new))
-    #["motd" "add"] (motd/add "unknown" (uuid/new))
-    #["motd" "rm" id] (motd/rm id)
-    #["motd"] (motd)
+    ["motd" "add" source id] (cosmo/motd/add source id (file/read stdin :all))
+    ["motd" "add" source] (cosmo/motd/add source (cosmo/uuid/new) (file/read stdin :all))
+    ["motd" "add"] (cosmo/motd/add "unknown" (cosmo/uuid/new) (file/read stdin :all))
+    ["motd" "rm" id] (cosmo/motd/rm id)
+    ["motd" "ls" &opt patt] (let [items (cosmo/motd/ls-contents patt)]
+                                 (eachk key items
+                                   (pp (merge (items key) {:id key}))))
+    ["motd" "help"] (motd/help)
+    ["motd"] (prin (string/join (cosmo/motd/ls-formatted) "\n\n"))
     ["get_node_name"] (print (cosmo/cache/get "node/name"))
     ["vars" "export"] (print (cosmo/universal-vars/export))
     ["vars" "help"] (print universal-vars/help)
