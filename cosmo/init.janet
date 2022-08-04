@@ -21,6 +21,12 @@
   "execute the interactive initialization process, this is idempotent"
   []
   (print "Starting initialization of cosmo repo...")
+
+  # TODO check if ssh-key was generated
+  # generate it
+  # TODO check if repo was cloned
+  # ask for url
+
   (print "Starting node init")
   (var old_node_name (cache/get "node/name"))
   (if (or (not old_node_name) (= old_node_name ""))
@@ -35,7 +41,6 @@
 
   # TODO check if node is already in any groups
   # if not print command to be execute on a :main node to add this node to some groups
-
 
   # TODO add following command somewhere else
   # init_node $id_of_node_to_add $group1 $group2 $group3

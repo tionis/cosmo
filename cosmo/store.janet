@@ -1,6 +1,7 @@
 (use ./util)
-(import ./glob :export true)
 (import flock)
+(import ./glob)
+(import ./base64)
 #(import ./crypto)
 
 #### Local Store #####
@@ -69,7 +70,7 @@
       (flock/release sync_lock))
     (do
       (create_dirs_if_not_exists (path/join (get_cosmo_config_dir) "store" (path/dirname formatted-key)))
-      (def node-id (cache/get "node/sign/public-key"))
+      (def node-id (base64/encode (cache/get "node/sign/public-key")))
       (if (or (not node-id) (= node-id "")) (error "Could not read node-id from local store/cache"))
       (spit path (string/format "%p" {:key key :value value :author node-id}))
       # TODO if encrypted generate key and encrypt it for each possible recipient
