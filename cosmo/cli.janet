@@ -128,7 +128,7 @@
             get_prompt - returns shell prompt module text
             init - intialize a new node
             sync - sync commands, for help use cosmo sync help
-            universal_vars - Universal Variables, check cosmo universal_vars help
+            vars - Universal Environment Variables, check cosmo vars help
             store - store commands, for help use cosmo store help
             motd - motd commands, for help use cosmo motd help`))
 

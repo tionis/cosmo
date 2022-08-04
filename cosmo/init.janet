@@ -17,14 +17,11 @@
 (defn status []
   (git/loud "status"))
 
-(defn init []
-  # TODO also set git ssh key for signing here, we could also guard against other possible miconfiguration here
-  # TODO always ensure that init can be executed as often as you like without changing outcome (I forgot the correct term for that property)
+(defn init
+  "execute the interactive initialization process, this is idempotent"
+  []
   (print "Starting initialization of cosmo repo...")
   (print "Starting node init")
-  # TODO create dirs in .cosmo when needed like messages (and maybe locks?)
-  # TODO if already setup ask if node init (skip asking if skip_node_init true)
-  # TODO ask for name for this node and which groups it should belong to
   (var old_node_name (cache/get "node/name"))
   (if (or (not old_node_name) (= old_node_name ""))
       (set old_node_name (exec-slurp "uname" "-n")))
@@ -32,13 +29,27 @@
   (def node_name (string/trim (file/read stdin :line)))
   (def new_node_name (if (= node_name "") old_node_name node_name))
   (cache/set "node/name" new_node_name)
-  #   YES -> print out command: cosmo init_node "$NAME" "$PUB_KEY" $GROUPS
-  #   NO  -> print out command: cosmo init_node "$NAME" "$PUB_KEY" $GROUPS
-  # This command adds the key of the node to the repo, signs and commits it, reecnrypts secrets which belong the mentioned groups and pushes it
-  # At the same time it checks which git hoster is used and depending on the groups its in adds the key to the user keys or the repo deploy keys using the respective api and tokens saved in secrets
-  # if command on other trusted machine is finished, the user should confirm this on the new node
+
+  # TODO check if own id is already in store
+  # if not add it
+
+  # TODO check if node is already in any groups
+  # if not print command to be execute on a :main node to add this node to some groups
+
+
+  # TODO add following command somewhere else
+  # init_node $id_of_node_to_add $group1 $group2 $group3
+  # this should be executed on a :main node (fails on other nodes)
+  # it will add the node to the groups and if :main is one of the mentioned groups
+  # it will add the new node to the sigchain
+  # then it will execute (each group groups (store/reencrypt group)) to reencrypt all secrets for the new node
+  # for this to work each secret is always also encrypted for :main
+  # while init_node is execute somewhere else the node waits, until the user says it is added or they want to skip this part
+  # if not skipped (git pull) and then check if node was added somewhere with a valid signature
+
+  # MAYBE also set git ssh key for signing here, we could also guard against other possible miconfiguration here
   # check if clone is successfull, else tell the user and wait for confirmation to try again, start completly from the beginning or abort the whole init process
-  # TODO if no hooks exist yet check if there are some at .config/cosmo/default_hooks and install them by copying them to .cosmo
+
   (let [source (path/join (get_cosmo_config_dir) "hooks" "pre-sync")
         target (path/join (get-cosmo-dir) "hooks" "pre-sync")]
     (if (file_exists? source)
@@ -49,8 +60,9 @@
     (if (file_exists? source)
         (do (spit target (slurp source))
             (os/chmod target "rwx------"))))
+
   # TODO execute script at .config/cosmo/init.janet
-  (os/mkdir (string (get-cosmo-dir) "/messages"))
+
   (git "config" "gpg.ssh.allowedSignersFile" (string (os/getenv "HOME") "/.ssh/allowed_signers"))
   (if (cache/get "node/sign/secret-key")
       (print "Skipping key generation as there are keys saved.")
