@@ -7,8 +7,11 @@
 (defn execute_pre_sync_hook []
   (def path (path/join (get-cosmo-dir) "hooks" "pre-sync"))
   (if (file_exists? path)
-    (do (print "Executing pre-sync-hook...")
-        (= (os/execute [path]) 0))
+      (do (print "Executing pre-sync-hook...")
+          (if (= (os/execute [path]) 0)
+            true
+            (do (pp {:result (os/execute [path]) :location "pre-sync"})
+                false)))
     true))
 
 (defn execute_post_sync_hook []
