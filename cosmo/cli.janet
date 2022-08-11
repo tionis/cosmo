@@ -25,7 +25,7 @@
              :help store/help}])
 
 (defn print_val [val]
-  (if (= (type val) :string)
+  (if (or (= (type val) :string) (= (type val) :buffer))
       (print val)
       (print (string/format "%j" val))))
 
