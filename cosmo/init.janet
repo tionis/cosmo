@@ -81,6 +81,10 @@
 
 (defn id "returns the id of the current node" [] (base64/encode (cache/get "node/sign/public-key")))
 
+(defn id/short [] (slice (id) 0 8))
+
+(defn id/safe [] (string/replace-all "/" "." (string/replace-all "=" "-" (id))))
+
 (defn motd/add [source id message] (cache/set (string "motd/" id) {:source source :message message}))
 (defn motd/rm [id] (cache/rm (string "motd/" id)))
 (defn motd/ls-contents [&opt patt]
