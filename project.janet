@@ -14,4 +14,5 @@
 (declare-executable
   :name "cosmo"
   :entry "cosmo/cli.janet"
+  :lflags ["-export-dynamic"]
   :install true)
