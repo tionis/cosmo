@@ -30,9 +30,9 @@
   (def prev (os/cwd))
   (os/cd store-path)
   (if (= glob-pattern nil)
-    (filesystem/scan-directory "." |(array/push ret $0))
+    (sh/scan-directory "." |(array/push ret $0))
     (let [pattern (glob/glob-to-peg glob-pattern)]
-        (filesystem/scan-directory "."
+        (sh/scan-directory "."
                                    |(if (peg/match pattern $0)
                                         (array/push ret $0)))))
   (os/cd prev)
@@ -62,12 +62,12 @@
   (if (not value)
     (do
       (def path (path/join (get_cosmo_config_dir) "store" key))
-      (def sync_lock (get-sync-lock))
+      (with [sync_lock (get-sync-lock)]
       (os/rm path)
       (git/loud_fail_on_error "reset")
       (git/loud_fail_on_error "add" "-f" path)
       (git/loud_fail_on_error "commit" "-m" (string "store: deleted " key))
-      (flock/release sync_lock))
+      (flock/release sync_lock)))
     (do
       (create_dirs_if_not_exists (path/join (get_cosmo_config_dir) "store" (path/dirname formatted-key)))
       (def node-id (base64/encode (cache/get "node/sign/public-key")))
@@ -78,11 +78,10 @@
       # -> save keys like this: {:keys ["pub-key" "encrypted-key"]}
       # also save groups in :groups
       # TODO generate signature
-      (def sync_lock (get-sync-lock))
-      (git/loud_fail_on_error "reset")
-      (git/loud_fail_on_error "add" "-f" path)
-      (git/loud_fail_on_error "commit" "-m" (string "store: set " key " to " value))
-      (flock/release sync_lock))))
+      (with [sync_lock (get-sync-lock)]
+        (git/loud_fail_on_error "reset")
+        (git/loud_fail_on_error "add" "-f" path)
+        (git/loud_fail_on_error "commit" "-m" (string "store: set " key " to " value)))))) # INFO this will output things <struct 0x5650D46E7DE8> for complex datatypes but that should be ok
 
 (defn store/ls [glob-pattern]
   (def store-path (path/join (get_cosmo_config_dir) "store"))
@@ -91,9 +90,9 @@
   (def prev (os/cwd))
   (os/cd store-path)
   (if (= glob-pattern nil)
-    (filesystem/scan-directory "." |(array/push ret $0))
+    (sh/scan-directory "." |(array/push ret $0))
     (let [pattern (glob/glob-to-peg glob-pattern)]
-        (filesystem/scan-directory "."
+        (sh/scan-directory "."
                                    |(if (peg/match pattern $0)
                                         (array/push ret $0)))))
   (os/cd prev)

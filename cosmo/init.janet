@@ -1,7 +1,6 @@
 #!/bin/env janet
 (import spork :prefix "" :export true)
 (import jhydro :export true)
-(import sqlite3 :export true)
 (import flock :export true)
 (import ./glob :export true)
 (import ./uuid :export true)
@@ -42,6 +41,8 @@
   # TODO check if node is already in any groups
   # if not print command to be execute on a :main node to add this node to some groups
 
+  # TODO import keys from hosts_db
+
   # TODO add following command somewhere else
   # init_node $id_of_node_to_add $group1 $group2 $group3
   # this should be executed on a :main node (fails on other nodes)
@@ -78,6 +79,14 @@
   (prin "Importing hosts db...")(flush)
   (hosts/import)
   (print " Done."))
+
+(defn clone
+  "Deletes the old repo if one exists and clones a new one from git remote specified."
+  [remote]
+  # TODO check if ssh url, if yes check if has key generated, else do interactiv generation
+  # TODO similar steps to setup.sh
+  # TODO decide if should auto execute init
+  )
 
 (defn id "returns the id of the current node" [] (base64/encode (cache/get "node/sign/public-key")))
 

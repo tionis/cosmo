@@ -47,16 +47,16 @@
   (if (enabled?)
     (do
       (try (do (prin "Acquiring sync lock... ")(flush)
-             (def sync_lock (get-sync-lock))
-             (print "Done.")
-             (if (not (execute_pre_sync_hook))
-               (do (print "Sync aborted due to pre-sync hook")
-                 (os/exit 1)))
+             (with [sync_lock (get-sync-lock)]
+               (print "Done.")
+               (if (not (execute_pre_sync_hook))
+                   (do (print "Sync aborted due to pre-sync hook")
+                       (error "pre-sync hook failed"))) # TODO catch this error in a cli wrapper
              (after_lock)
-             (flock/release sync_lock))
-        ([err]
+             (flock/release sync_lock)))
+        ([err] # TODO don't just assume file locking failed -> more complex error handling for failed hooks
           (pp err)
-          (print "Normal file locking failed, falling back to using flock...")
+          (print "Normal file locking failed, falling back to using flock...") # TODO replace this ugly hack with more graceful fallback
           (os/execute ["flock" "-x" (string (get-cosmo-dir) "/sync.lock") "-c" "cosmo sync after_lock"] :p))))
     (eprint "Sync disabled!")))
 

@@ -1,7 +1,6 @@
 (import flock)
-#(import sqlite3 :export true)
+(import spork/sh :export true)
 (import spork/path :export true)
-(import ./filesystem :export true)
 
 (defn home []
   (def p (os/getenv "HOME"))
@@ -110,11 +109,10 @@
   #return false
   )
 
-
 (defn create_dirs_if_not_exists [dir]
   (let [meta (os/stat dir)]
     (if (not (and meta (= (meta :mode) :directory)))
-      (filesystem/create-directories dir))))
+      (sh/create-dirs dir))))
 
 (defn check_git_install []
   (def version (git "version"))
