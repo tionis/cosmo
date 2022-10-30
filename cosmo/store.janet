@@ -106,3 +106,9 @@
   (each item (store/ls glob-pattern)
     (put ret item (store/get item)))
   ret)
+
+(defn get [key]
+  (let [cached (cache/get key)]
+    (if cached
+      cached
+      (store/get key))))
