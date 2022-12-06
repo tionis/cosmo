@@ -23,7 +23,7 @@
 
 (defn after_lock []
   (def head_before_sync ((git/fail_on_error "rev-parse" "HEAD") :text))
-  (git/loud "pull" "--no-rebase" "--no-edit")
+  (git/loud "pull" "--autostash" "--no-edit" "--recurse-submodules=on-demand")
   # check if all commits since head_before_sync were signed, abort if not NOTE: this may be to radical and break things, maybe just define that the last edit of some important files should be signed
   # secrets_generate-allowed-signers # TODO only do this when there were relevant changes
   # secrets_generate-allowed-keys # TODO only do this when there were relevant changes
