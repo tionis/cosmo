@@ -39,7 +39,7 @@
       (git/loud "push"))
     (print "Nothing to push"))
   (if (not (execute_post_sync_hook))
-      (eprint "Post_sync_hook failed!")))
+      (error "Post_sync_hook failed!")))
 
 (defn sync []
   # TODO check if internet and abort if not (this has to be able to be disabled )(maybe check config?)
@@ -58,7 +58,7 @@
           (pp err)
           (print "Normal file locking failed, falling back to using flock...")
           (os/execute ["flock" "-x" (string (get-cosmo-dir) "/sync.lock") "-c" "cosmo sync after_lock"] :p))))
-    (eprint "Sync disabled!")))
+    (error "Sync disabled!")))
 
 (defn disable [] (cache/set "sync/disabled" true))
 
