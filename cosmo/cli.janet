@@ -133,6 +133,7 @@
             motd - motd commands, for help use cosmo motd help`))
 
 (defn main [_ & raw_args]
+  (cosmo/check-deps)
   (match raw_args
     ["init"] (cosmo/init)
     ["help"] (help)

@@ -1,5 +1,6 @@
 (import flock)
 #(import sqlite3 :export true)
+(import spork/sh :export true)
 (import spork/path :export true)
 (import ./filesystem :export true)
 
@@ -133,3 +134,50 @@
 (defn file_exists? [path]
   (def stat (os/stat path))
   (and (not (= stat nil)) (= (stat :mode) :file)))
+
+(def minimum-git-version [2 34 0])
+
+(def minimum-openssh-version [8 0])
+
+(defn is-at-least-version [actual at-least]
+  (label is-at-least
+    (loop [i :range [0 (min (length actual) (length at-least))]]
+      (cond
+        (> (actual i) (at-least i)) (return is-at-least true)
+        (< (actual i) (at-least i)) (return is-at-least false)))
+    true))
+
+(def git-version-grammar (peg/compile
+  ~{:patch (number (some :d))
+    :minor (number (some :d))
+    :major (number (some :d))
+    :main (* "git version " :major "." :minor "." :patch)}))
+
+(defn get-git-version []
+  (peg/match git-version-grammar (sh/exec-slurp "git" "--version")))
+
+(def openssh-version-grammar (peg/compile
+  ~{:minor (number (some :d))
+    :major (number (some :d))
+    :main (* "OpenSSH_" :major "." :minor)}))
+
+(defn get-openssh-version []
+  (peg/match openssh-version-grammar ((sh/exec-slurp-all "ssh" "-V") :err)))
+
+(defn check-deps []
+  (when (not (dyn :deps-checked))
+    (unless (is-at-least-version (get-git-version) minimum-git-version)
+      (error (string "minimum-git-version is "
+                     (string/join (map |(string $0)
+                                       minimum-git-version) ".")
+                     " but detected git version is "
+                     (string/join (map |(string $0)
+                                       (get-git-version)) "."))))
+    (unless (is-at-least-version (get-openssh-version) minimum-openssh-version)
+      (error (string "minimum-openssh-version is "
+                     (string/join (map |(string $0)
+                                       minimum-openssh-version) ".")
+                     " but detected openssh version is "
+                     (string/join (map |(string $0)
+                                       (get-openssh-version)) "."))))
+    (setdyn :deps-checked true)))
