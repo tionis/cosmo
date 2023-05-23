@@ -38,8 +38,9 @@
     (do (print "Starting push...")
       (git/loud "push"))
     (print "Nothing to push"))
-  (if (not (execute_post_sync_hook))
-      (error "Post_sync_hook failed!")))
+  (when (not (execute_post_sync_hook))
+      (eprint "Post_sync_hook failed!")
+      (os/exit 1)))
 
 (defn sync []
   # TODO check if internet and abort if not (this has to be able to be disabled )(maybe check config?)
