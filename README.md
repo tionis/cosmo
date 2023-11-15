@@ -1,5 +1,6 @@
 # Cosmo
 > WARNING: Cosmo is deprecated as I don't use it anymore. I switched to some bash+janet scripts that live directly in my dotfiles repo.
+
 If you want to this yourself initialize the repo like described in https://www.atlassian.com/git/tutorials/dotfiles
 and build your own small bash script to manage it. To keep machine local changes I use a unique branch per client/node type and continously rebase it on the main branch.
 
